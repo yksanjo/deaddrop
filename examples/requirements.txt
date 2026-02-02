@@ -1,0 +1,3 @@
+# Examples dependencies
+# Install client first: pip install -e ../client
+httpx>=0.25.0

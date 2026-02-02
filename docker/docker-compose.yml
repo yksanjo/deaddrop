@@ -1,0 +1,52 @@
+version: "3.8"
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  deaddrop-server:
+    build:
+      context: ../server
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - MAX_MESSAGE_SIZE=1048576
+      - MESSAGE_TTL_SECONDS=86400
+      - STREAM_MAX_LEN=10000
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  mcp-server:
+    build:
+      context: ../mcp-server
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8000"
+    environment:
+      - DEADDROP_SERVER_URL=http://deaddrop-server:8000
+      - MCP_AGENT_ID=mcp-server
+      - MCP_API_KEY=mcp-secret-key
+    depends_on:
+      deaddrop-server:
+        condition: service_healthy
+
+volumes:
+  redis_data:
